@@ -36,7 +36,9 @@ describe('LoginHandler test suite', () => {
             responseMock as any,
             authorizerMock as any
         )
+
         Utils.getRequestBody = getRequestBodyMock // Mock the Utils.getRequestBody() method
+        requestMock.method = HTTP_METHODS.POST
     })
 
     afterEach(() => {
@@ -56,8 +58,6 @@ describe('LoginHandler test suite', () => {
     })
 
     test('post request with a valid login', async () => {
-        requestMock.method = HTTP_METHODS.POST
-
         // setup requestBody which needs to be of type Account
         getRequestBodyMock.mockReturnValueOnce({
             username: 'corey',
@@ -74,8 +74,6 @@ describe('LoginHandler test suite', () => {
     })
 
     test('post request with an invalid login', async () => {
-        requestMock.method = HTTP_METHODS.POST
-
         // setup requestBody which needs to be of type Account
         getRequestBodyMock.mockReturnValueOnce({
             username: 'corey',
@@ -91,8 +89,6 @@ describe('LoginHandler test suite', () => {
     })
 
     test('post request with an unexpected error', async () => {
-        requestMock.method = HTTP_METHODS.POST
-
         // throw an error at the getRequestBodyMock step
         getRequestBodyMock.mockRejectedValueOnce(new Error('something went wrong'))
 
