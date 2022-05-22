@@ -1,5 +1,5 @@
 import { SessionToken } from '../Models/ServerModels';
-import * as Nedb from 'nedb';
+import Nedb = require("nedb");
 
 export class SessionTokenDBAccess {
 
