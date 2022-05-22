@@ -55,7 +55,7 @@ describe('LoginHandler test suite', () => {
         expect(responseMock.writeHead).not.toHaveBeenCalled()
     })
 
-    test.only('post request with a valid login', async () => {
+    test('post request with a valid login', async () => {
         requestMock.method = HTTP_METHODS.POST
 
         // setup requestBody which needs to be of type Account
@@ -71,5 +71,33 @@ describe('LoginHandler test suite', () => {
         expect(responseMock.statusCode).toBe(HTTP_CODES.CREATED)
         expect(responseMock.writeHead).toBeCalledWith(HTTP_CODES.CREATED, { 'Content-Type': 'application/json' })
         expect(responseMock.write).toBeCalledWith(JSON.stringify(testSessionToken))
+    })
+
+    test('post request with an invalid login', async () => {
+        requestMock.method = HTTP_METHODS.POST
+
+        // setup requestBody which needs to be of type Account
+        getRequestBodyMock.mockReturnValueOnce({
+            username: 'corey',
+            password: '123456'
+        })
+
+        // setup an invalid token
+        authorizerMock.generateToken.mockReturnValueOnce(null)
+
+        await loginHandler.handleRequest()
+        expect(responseMock.statusCode).toBe(HTTP_CODES.NOT_fOUND)
+        expect(responseMock.write).toBeCalledWith('wrong username or password')
+    })
+
+    test('post request with an unexpected error', async () => {
+        requestMock.method = HTTP_METHODS.POST
+
+        // throw an error at the getRequestBodyMock step
+        getRequestBodyMock.mockRejectedValueOnce(new Error('something went wrong'))
+
+        await loginHandler.handleRequest()
+        expect(responseMock.statusCode).toBe(HTTP_CODES.INTERNAL_SERVER_ERROR)
+        expect(responseMock.write).toBeCalledWith('Internal error: something went wrong')
     })
 })
