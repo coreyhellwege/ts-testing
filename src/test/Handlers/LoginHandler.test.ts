@@ -1,6 +1,6 @@
 import { LoginHandler } from '../../app/Handlers/LoginHandler'
-import { HTTP_METHODS, HTTP_CODES } from '../../app/Models/ServerModels'
-
+import { HTTP_METHODS, HTTP_CODES, SessionToken } from '../../app/Models/ServerModels'
+import { Utils } from '../../app/Utils/Utils'
 
 describe('LoginHandler test suite', () => {
     let loginHandler: LoginHandler
@@ -10,10 +10,25 @@ describe('LoginHandler test suite', () => {
     }
 
     const responseMock = {
-        writeHead: jest.fn() // mock function
+        writeHead: jest.fn(), // mock function
+        write: jest.fn(),
+        statusCode: 0
     }
     
-    const authorizerMock = {}
+    const authorizerMock = {
+        generateToken: jest.fn()
+    }
+
+    const getRequestBodyMock = jest.fn()
+
+    // create a stub for session token
+    const testSessionToken: SessionToken = {
+        tokenId: 'someTokenId',
+        userName: 'someUserName',
+        valid: true,
+        expirationTime: new Date(),
+        accessRights: [1,2,3]
+    }
 
     beforeEach(() => {
         loginHandler = new LoginHandler(
@@ -21,11 +36,40 @@ describe('LoginHandler test suite', () => {
             responseMock as any,
             authorizerMock as any
         )
+        Utils.getRequestBody = getRequestBodyMock // Mock the Utils.getRequestBody() method
+    })
+
+    afterEach(() => {
+        jest.clearAllMocks() // good practice to always clear mocks after tests run
     })
 
     test('options request', async () => {
         requestMock.method = HTTP_METHODS.OPTIONS
         await loginHandler.handleRequest()
         expect(responseMock.writeHead).toBeCalledWith(HTTP_CODES.OK)
+    })
+
+    test('not handled http method', async () => {
+        requestMock.method = 'randomMethod'
+        await loginHandler.handleRequest()
+        expect(responseMock.writeHead).not.toHaveBeenCalled()
+    })
+
+    test.only('post request with a valid login', async () => {
+        requestMock.method = HTTP_METHODS.POST
+
+        // setup requestBody which needs to be of type Account
+        getRequestBodyMock.mockReturnValueOnce({
+            username: 'corey',
+            password: '123456'
+        })
+
+        // setup token
+        authorizerMock.generateToken.mockReturnValueOnce(testSessionToken)
+
+        await loginHandler.handleRequest()
+        expect(responseMock.statusCode).toBe(HTTP_CODES.CREATED)
+        expect(responseMock.writeHead).toBeCalledWith(HTTP_CODES.CREATED, { 'Content-Type': 'application/json' })
+        expect(responseMock.write).toBeCalledWith(JSON.stringify(testSessionToken))
     })
 })
