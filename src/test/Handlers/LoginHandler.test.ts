@@ -31,6 +31,7 @@ describe('LoginHandler test suite', () => {
     }
 
     beforeEach(() => {
+        // Instantiate the constructor
         loginHandler = new LoginHandler(
             requestMock as any,
             responseMock as any,
