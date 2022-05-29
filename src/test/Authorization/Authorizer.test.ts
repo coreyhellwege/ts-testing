@@ -1,5 +1,5 @@
-import { Authorizer } from '../../app/Authorization/Authorizer';
-import { HTTP_METHODS, HTTP_CODES, SessionToken, Account } from '../../app/Models/ServerModels'
+import { Authorizer } from '../../app/Authorization/Authorizer'
+import { HTTP_METHODS, HTTP_CODES, SessionToken, Account, TokenState } from '../../app/Models/ServerModels'
 import { SessionTokenDBAccess } from '../../app/Authorization/SessionTokenDBAccess'
 import { UserCredentialsDbAccess } from '../../app/Authorization/UserCredentialsDbAccess'
 
@@ -7,62 +7,105 @@ import { UserCredentialsDbAccess } from '../../app/Authorization/UserCredentials
 jest.mock('../../app/Authorization/SessionTokenDBAccess')
 jest.mock('../../app/Authorization/UserCredentialsDbAccess')
 
+const testAccount: Account = {
+    username: 'someUser',
+    password: 'somePassword'
+}
+
 describe('Authorizer test suite', () => {
     let authorizer: Authorizer
 
-    const sessionTokenDBAccessMock = {
-        storeSessionToken: jest.fn()
+    let sessionTokenDBAccessMock = {
+        storeSessionToken: jest.fn(),
+        getToken: jest.fn()
     }
 
-    const userCredentialsDbAccessMock = {
+    let userCredentialsDBAccessMock = {
         getUserCredential: jest.fn()
     }
 
-    const testAccount: Account = {
-        username: 'corey',
-        password: '123456'
-    }
-
     beforeEach(() => {
-        // Instantiate the constructor
         authorizer = new Authorizer(
             sessionTokenDBAccessMock as any,
-            userCredentialsDbAccessMock as any
+            userCredentialsDBAccessMock as any
         )
     })
 
     afterEach(() => {
-        jest.clearAllMocks() // good practice to always clear mocks after tests run
+        jest.clearAllMocks()
     })
 
     test('constructor arguments', () => {
-        // Instantiate the constructor
         new Authorizer()
-        expect(SessionTokenDBAccess).toBeCalled()
-        expect(UserCredentialsDbAccess).toBeCalled()
+        expect(SessionTokenDBAccess).toBeCalledTimes(1)
+        expect(UserCredentialsDbAccess).toBeCalledTimes(1)
     })
 
-    test('should return sessionToken for valid login credentials', async () => {
-        // use Jest spies to replace the Math.random and Date.now global methods with values which will remain the same during our test
-        // Jest spyOn simply replaces a function with a mock function
-        jest.spyOn(global.Math, 'random').mockReturnValueOnce(0)
-        jest.spyOn(global.Date, 'now').mockReturnValueOnce(0)
-
-        userCredentialsDbAccessMock.getUserCredential.mockResolvedValueOnce({
-            username: 'corey',
-            accessRights: [1,2,3]
+    describe('login user tests suite', () => {
+        test('should return null if invalid credentials', async () => {
+            userCredentialsDBAccessMock.getUserCredential.mockReturnValue(null)
+            const loginResult = await authorizer.generateToken(testAccount)
+            expect(loginResult).toBeNull
+            expect(userCredentialsDBAccessMock.getUserCredential).
+                toBeCalledWith(testAccount.username, testAccount.password)
         })
 
-        const expectedSessionToken: SessionToken = {
-            userName: 'corey',
-            accessRights: [1,2,3],
-            valid: true,
-            tokenId: '',
-            expirationTime: new Date(60 * 60 * 1000)
-        }
+        test('should return session token for valid login credentials', async () => {
+            // use Jest spies to replace the Math.random and Date.now global methods with values which will remain the same during our test
+            // Jest spyOn simply replaces a function with a mock function
+            jest.spyOn(global.Math, 'random').mockReturnValueOnce(0)
+            jest.spyOn(global.Date, 'now').mockReturnValueOnce(0)
+            userCredentialsDBAccessMock.getUserCredential.mockReturnValue({
+                accessRights: [1, 2, 3],
+                username: 'someUser',
+                password: 'somePassword'
+            })
+            const expectedSessionToken: SessionToken = {
+                accessRights: [1, 2, 3],
+                userName: 'someUser',
+                valid: true,
+                expirationTime: new Date(1000 * 60 * 60),
+                tokenId: ''
+            }
+            const sessionToken = await authorizer.generateToken(testAccount)
+            expect(expectedSessionToken).toStrictEqual(sessionToken)
+            expect(sessionTokenDBAccessMock.storeSessionToken).toHaveBeenCalledWith(sessionToken)
+        })
+    })
 
-        const sessionToken = await authorizer.generateToken(testAccount)
-        expect(expectedSessionToken).toEqual(sessionToken)
-        expect(sessionTokenDBAccessMock.storeSessionToken).toBeCalledWith(sessionToken)
+    describe('validateToken tests', () => {
+        test('validateToken returns invalid for null token', async () => {
+            sessionTokenDBAccessMock.getToken.mockReturnValueOnce(null)
+            const sessionToken = await authorizer.validateToken('123')
+            expect(sessionToken).toStrictEqual({
+                accessRights: [],
+                state: TokenState.INVALID
+            })
+        })
+
+        test('validateToken returns expired for expired tokens', async () => {
+            const dateInPast = new Date(Date.now() - 1)
+            sessionTokenDBAccessMock.getToken.mockReturnValueOnce({ valid: true, expirationTime: dateInPast })
+            const sessionToken = await authorizer.validateToken('123')
+            expect(sessionToken).toStrictEqual({
+                accessRights: [],
+                state: TokenState.EXPIRED
+            })
+        })
+
+        test('validateToken returns valid for not expired and valid tokens', async () => {
+            const dateInFuture = new Date(Date.now() + 100000)
+            sessionTokenDBAccessMock.getToken.mockReturnValue(
+                {
+                    valid: true,
+                    expirationTime: dateInFuture,
+                    accessRights: [1]
+                })
+            const sessionToken = await authorizer.validateToken('123')
+            expect(sessionToken).toStrictEqual({
+                accessRights: [1],
+                state: TokenState.VALID
+            })
+        })
     })
 })
