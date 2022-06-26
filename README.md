@@ -63,6 +63,14 @@ Stubs are used to validate state. I.e stubs ensure the state of your tests are s
 Embedded persistent or in memory database for Node.js
 Just using this for the purpose of running these example tests.
 
+<br />
+
+## Packages:
+
+* ### [ts-jest](https://github.com/kulshekhar/ts-jest)
+    Library that lets you use Jest to test projects written in TypeScript.
+* ### [ts-node](https://github.com/TypeStrong/ts-node)
+    Library that transforms TypeScript into JavaScript, enabling you to directly execute TypeScript on Node.js without precompiling.
 
 <br />
 
